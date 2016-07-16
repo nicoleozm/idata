@@ -48,7 +48,7 @@ ggplot(instaData[num_people>0], aes(factor(includes_me), num_likes)) + geom_boxp
 
 Since the two samples had different variances, I had to use a Mann-Whitney test. I did this a bit blindly, reading one R blogger page and calling it good. 
 
-Blind testing is not usually bueno, and since I had never heard of this test before, I decided to do a quick google. As it turns out, the main purpose of the Mann-Whitney U test is to reject or not reject the null hypothesis that two samples, we'll call them X and Y, come from the same umbrella population. Thus, the probability that X > Y is the same as the probability that Y > X. 
+Blind testing is not usually bueno, and since I had never heard of this test before, I decided to do a quick google. As it turns out (according to [wikipedia](https://en.wikipedia.org/wiki/Mann%E2%80%93Whitney_U_test)), the main purpose of the Mann-Whitney U test is to reject or not reject the null hypothesis that two samples, we'll call them X and Y, come from the same umbrella population. Thus, the probability that X > Y is the same as the probability that Y > X. 
 
 In our modern age of computing, we can do this (or something pretty similar) with simulations rather than using statistical tests. Since my two samples didn't have the same number of observations, calculating X - Y, as the Mann-Whitney test in R does isn't something I can do. 
 
