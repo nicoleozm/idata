@@ -1,0 +1,155 @@
+---
+title: "Statistical Tests and Simulations"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# install a few packages
+library("data.table")
+library("ggplot2")
+library("plyr")
+
+# create working directory path
+path_base <- getwd()
+folder_name <- "idata"
+data <- "data"
+
+# set plot themes
+theme_nicole =  theme(
+    axis.text = element_text(size = 14),
+    legend.key = element_rect(fill = "white"),
+    legend.background = element_rect(fill = "white"),
+    legend.position = c(0.14, 0.80),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.background = element_rect(fill = "aliceblue")
+  )
+
+# bring in data
+instaData <- read.csv(paste(path_base, data, 'jun_30_instadata.csv', sep = '/'), sep = ',', header = TRUE)
+instaData <- data.table(instaData)
+
+# pics of me vs not
+ggplot(instaData[num_people>0], aes(factor(includes_me), num_likes)) + geom_boxplot() + xlab('Includes me - 0: nope, 1:yes!') + ylab('Number of likes') + theme_nicole
+
+# next steps:
+# do simulation: choose 40 x's and 40 y's from the x distribution. do the basic wilkinsin stuff 
+# do the actual test
+# talk about what it means
+# for the simulation, make the mother population the population of likes in general, because that's the population that all the x's and y's would come from otherwise.
+```
+
+## Mann-Whitney U test
+I know last time I promised some updates about small n and large p and scraping and this and that and some other nonsense, but I actually got a bit hung up on the Mann-Whitney test that I used last time to determine the differences between the two sample distributions I got for pictures that included me and those that didn't. As a reminder, those samples look like this:
+
+```{r, echo = F, warning = F}
+ggplot(instaData[num_people>0], aes(factor(includes_me), num_likes)) + geom_boxplot() + xlab('Includes me - 0: nope, 1:yes!') + ylab('Number of likes') + theme_nicole
+```
+
+Since the two samples had different variances, I had to use a Mann-Whitney test. I did this a bit blindly, reading one R blogger page and calling it good. 
+
+Blind testing is not usually bueno, and since I had never heard of this test before, I decided to do a quick google. As it turns out, the main purpose of the Mann-Whitney U test is to reject or not reject the null hypothesis that two samples, we'll call them X and Y, come from the same umbrella population. Thus, the probability that X > Y is the same as the probability that Y > X. 
+
+In our modern age of computing, we can do this (or something pretty similar) with simulations rather than using statistical tests. Since my two samples didn't have the same number of observations, calculating X - Y, as the Mann-Whitney test in R does isn't something I can do. 
+
+However, we can do one step better by simulating with our actual data and getting an actual probability as our p value - no assumptions required. We can randomly sample from our overall "population" (insta post like data), giving each post an arbitrary assignment to sample X or Y. If we do this sampling, what is the probability that the difference in means between X and Y is greater than or equal to the difference that we saw between the means of the two samples in question: posts that include me and posts that don't.
+
+## Let's simulate!
+First, let's remember what our data look like:
+```{r, echo = F, warning = F}
+# first, we have the data
+instaData[1:10, .(img_number, num_people, includes_me, num_likes)]
+```
+
+Next, we'll randomly assign our insta data into two different groups. We'll make sure the sizes of the two groups mirror the sizes of the two groups we care about comparing to: posts with pictures of me (nx) and posts with pictures without me (ny). 
+
+```{r}
+nx <- nrow(instaData[includes_me<1 & num_people>0,])
+ny <- nrow(instaData[num_people>0]) - nx
+```
+
+Now we can take our random samples and look at the distribution of likes on our two samples!
+
+```{r, echo = F, message = F, warning=F}
+instaWithPeople <- instaData[num_people>0]
+# nrow(instaWithPeople)
+
+sampleX <- instaWithPeople[sample(1:nrow(instaWithPeople), nx, replace=F), .(img_number,includes_me, num_likes)]
+instaWithPeople$sampleX <- ifelse(instaWithPeople$img_number %in% sampleX$img_number,1,0)
+sampleY <- instaWithPeople[sampleX=='0', .(img_number, includes_me, num_likes)]
+ 
+# now let's look at the two random samples:
+ggplot(instaWithPeople, aes(factor(sampleX), num_likes)) + geom_boxplot() + xlab('in random sample 1 - 0:nope, 1:yes!') + ylab('Number of likes') + theme_nicole
+```
+
+## Now that we've done one simulation, let's do a bunch!
+We'll create a function to do all the dirty work for us:
+
+```{r, message = F, warning = F}
+
+# create a function to do all the stuff we just did:
+picSimulation <- function(data, n, nx, depVar, idVar) {
+  
+  meanList <- list()
+  
+  for(i in 1:n){
+    sampleX <- data[sample(1:nrow(data), nx, replace = F)]
+    data[['sampleX']] <- ifelse(data[[idVar]] %in% sampleX[[idVar]], 1, 0)
+    
+    # calculate means of the random samples:
+    meanX = mean(data[sampleX=='1'][[depVar]])
+    meanY = mean(data[sampleX=='0'][[depVar]])
+    diffMeans = meanY - meanX
+    
+    meanList[i] = diffMeans
+  }
+  return(meanList)
+}
+```
+
+We can use this function to simulate, 1000 times, and get a distribution of mean differences. That distribution looks like this:
+
+```{r, echo = F, message = F, warning = F}
+# let's simulate! n = 1000
+mean_list <- picSimulation(instaWithPeople, 10000, nx, 'num_likes', 'img_number')
+
+# convert the list to a data frame
+unlisted_mean_list <- unlist(mean_list)
+df <- data.frame(unlisted_mean_list)
+df <- data.table(df)
+
+# and plot (we should see a normal distribution here)
+ggplot(data = df, aes(x = unlisted_mean_list)) + geom_histogram(binwidth = .5) + theme_nicole
+```
+
+# Now let's have the answer!
+Now that we have a distribution of mean differences, let's figure out the probability that we would get the difference in means we got given that the two came from the same population. 
+
+```{r, echo = F, message = F, warning = F}
+# our actual difference in means:
+
+# quick validation:
+val_len <- length(instaWithPeople[includes_me==1, num_likes])
+val_len <- length(instaWithPeople[includes_me==0, num_likes])
+
+mean_me <- mean(instaWithPeople[includes_me==1, num_likes])
+mean_not_me <- mean(instaWithPeople[includes_me==0, num_likes])
+
+diff <- mean_me - mean_not_me
+```
+
+The true difference is `r round(diff, 3)`. 
+
+Now let's get the probability (from our distribution!!) that the mean difference would be that large or greater:
+
+```{r, message = F, warning = F}
+nrow(df[unlisted_mean_list > diff])/nrow(df)
+```
+
+Wow! The probability that we would get the mean difference that we did between pics with me and pics without me if there really was no difference between the two is less than one percent - really unlikely! This means that it's highly likely that the two samples are distinct, that is, they are statistically significantly different from each other!
+
+<br>
+<br>
+
+Feel free to check out the full script on [GitHub](http://github.com/nicoleozm/idata)!
+

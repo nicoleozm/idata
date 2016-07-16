@@ -13,8 +13,8 @@ library("ggplot2")
 
 # create working directory path
 path_base <- getwd()
-folder_name <- "insta_data"
-# data <- (data folder, doesn't exist yet)
+folder_name <- "idata"
+data <- "data"
 
 # set plot themes
 theme_nicole =  theme(
@@ -28,8 +28,12 @@ theme_nicole =  theme(
   )
 
 # bring in data
-instaData <- fread(paste(path_base, folder_name, 'jun_30_instadata.csv', sep = '/'), sep = ',', header = TRUE)
+instaData <- read.csv(paste(path_base, data, 'jun_30_instadata.csv', sep = '/'), sep = ',', header = TRUE)
+instaData <- data.table(instaData)
+
+
 #instaData <- fread(paste(path_base, 'insta_data.txt', sep = '/'), sep = ',', header = TRUE)
+#instaData <- readRDS(paste(path_base, folder_name, data, 'jun_30_instadata.RDS', sep = '/'))
 
 # mess with the data
 instaData[instaData$day_of_week=='wednesady']$day_of_week <- "wednesday"
@@ -59,6 +63,8 @@ instaPortraits$nonHumanPortrait <- ifelse(instaPortraits$num_people==0, 1, 0)
 # TITLE: "An exercise in narcisism"
 # TITLE: 
 
+# save data
+# saveRDS(instaData, paste(path_base, folder_name, data, 'jun_30_instadata.RDS', sep = '/'))
 
 ```
 
